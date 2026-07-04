@@ -8,10 +8,6 @@ This repository is for the purpose of making the application usable on your loca
 - **Other platforms:** Run `server.exe` (or `mac-server` for MacOS, `linux-server` for linux), or use any static-file server.
 
 
-[![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg?longCache=true&style=popout)](https://www.paypal.me/kyleburtondonate
-) ← Help out Card Conjurer's original creator, Kyle. We love you buddy.
-
-
 ## Using Local Images
 
 If you're saving a lot of cards with custom images you might hit the data limit for uploaded images (about 2MB).
