@@ -76,3 +76,17 @@ Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS w
 - Apache caching: images cached 1y, CSS 31d, JS 1d (commented values in .htaccess).
 - nginx caching: CSS/JS 1y, HTML/JSON no cache.
 - The `data/` directory contains both runtime assets (fonts, images) and JS utilities (scripts/).
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown — issues live as files under `.scratch/<feature>/` in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
