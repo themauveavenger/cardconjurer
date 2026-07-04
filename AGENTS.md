@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 ## OVERVIEW
-Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS web app served via nginx (Docker) or Apache. SPA navigation via HTMX. 3000+ image assets, 296 frame definition JS files.
+Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS web app. SPA navigation via HTMX. 3000+ image assets, 296 frame definition JS files.
 
 ## STRUCTURE
 ```
@@ -25,10 +25,7 @@ Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS w
 ├── print/          # Printing tool page
 ├── theme/          # Theme editor page
 ├── tutorial/       # Tutorial page
-├── app.conf        # nginx config
-├── Dockerfile      # Docker build (nginx:1.21-alpine)
 ├── launcher.py     # Desktop launcher
-├── Makefile        # make start → docker build + run
 ├── .htaccess       # Apache caching rules
 ├── index.html      # Main SPA entry
 └── README.md
@@ -47,8 +44,7 @@ Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS w
 | Static assets | img/ | 60+ frame style dirs, mana symbols, set symbols |
 | Fonts | data/fonts/ | MTG fonts (beleren, matrix, mplantin, phyrexian) |
 | CI/CD | (removed) | Personal fork — no automated deploy |
-| Docker config | app.conf, Dockerfile | nginx:1.21-alpine, port 4242 |
-| Desktop launcher | launcher.py, setup-desktop.sh, start-cardconjurer.sh | PyInstaller-based local server launcher; Linux desktop shortcut setup |
+| Desktop launcher | launcher.py, setup-desktop.sh, start-cardconjurer.sh | Python HTTP server + desktop shortcut setup |
 
 ## CONVENTIONS
 - **Frame packs**: Each `js/frames/pack*.js` file defines an `availableFrames` array of `{name, src, masks}` objects. Group files (`group*.js`) call `loadFramePacks()` with categorized frame lists.
@@ -67,14 +63,10 @@ Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS w
 ## COMMANDS
 | Task | Command | Notes |
 |------|---------|-------|
-| Start dev server (Docker) | `make start` | Builds + runs on port 4242 |
-| Start dev server (Python) | `python launcher.py` | Lightweight local server |
+| Start dev server | `python launcher.py` or `start-cardconjurer.sh` | Python HTTP server on port 8080 |
 | Sync to production | (none) | Personal fork — deploy manually if needed |
 
 ## NOTES
-- CORS disabled in `.htaccess` (commented out). S3 bucket serves the app directly.
-- Apache caching: images cached 1y, CSS 31d, JS 1d (commented values in .htaccess).
-- nginx caching: CSS/JS 1y, HTML/JSON no cache.
 - The `data/` directory contains both runtime assets (fonts, images) and JS utilities (scripts/).
 
 ## Agent skills
