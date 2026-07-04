@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Card Conjurer
+Comment=Custom Magic: The Gathering card creator
+# Run setup-desktop.sh to generate this file with the correct path
+Exec=PATH_TO_PROJECT/start-cardconjurer.sh
+Icon=PATH_TO_PROJECT/core/apple-touch-icon.png
+Terminal=true
+Categories=Game;Graphics;
