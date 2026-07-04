@@ -46,16 +46,16 @@ Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS w
 | Styles | css/ | reset.css + main style-9.css |
 | Static assets | img/ | 60+ frame style dirs, mana symbols, set symbols |
 | Fonts | data/fonts/ | MTG fonts (beleren, matrix, mplantin, phyrexian) |
-| CI/CD | .github/workflows/publish.yaml | S3 sync to cardconjurer.app on master push |
+| CI/CD | (removed) | Personal fork — no automated deploy |
 | Docker config | app.conf, Dockerfile | nginx:1.21-alpine, port 4242 |
-| Desktop launcher | launcher.py | PyInstaller-based local server launcher |
+| Desktop launcher | launcher.py, setup-desktop.sh, start-cardconjurer.sh | PyInstaller-based local server launcher; Linux desktop shortcut setup |
 
 ## CONVENTIONS
 - **Frame packs**: Each `js/frames/pack*.js` file defines an `availableFrames` array of `{name, src, masks}` objects. Group files (`group*.js`) call `loadFramePacks()` with categorized frame lists.
 - **HTMX navigation**: Sub-pages loaded into `#content` div via `hx-get`. Each subdirectory has its own `index.html` that works as a standalone page.
 - **Theme persistence**: Themes stored as JSON in `localStorage`, applied via CSS custom properties on `:root`.
 - **Image assets**: PNG/SVG frame parts in `img/frames/<style>/`. Mana symbols in `img/manaSymbols/<style>/`. Set symbols in `img/setSymbols/<official|custom>/`.
-- **Local art**: Place images in `local_art/`, reference by filename in the URL field.
+- **Local art**: Place images in `local_art/`. They appear in a dropdown in the Art tab; bare filenames typed in the "Via URL" field also resolve to `local_art/`.
 - **File naming**: Numbered suffixes for versioned JS (main-1.js, creator-23.js, style-9.css).
 
 ## ANTI-PATTERNS
@@ -69,7 +69,7 @@ Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS w
 |------|---------|-------|
 | Start dev server (Docker) | `make start` | Builds + runs on port 4242 |
 | Start dev server (Python) | `python launcher.py` | Lightweight local server |
-| Sync to production | git push to master | GitHub Actions → S3 |
+| Sync to production | (none) | Personal fork — deploy manually if needed |
 
 ## NOTES
 - CORS disabled in `.htaccess` (commented out). S3 bucket serves the app directly.

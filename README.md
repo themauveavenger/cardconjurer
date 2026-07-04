@@ -4,8 +4,8 @@ In November of 2022, Wizards of the Coast served the original creator and webhos
 This repository is for the purpose of making the application usable on your local machine and maintaining templates in perpetuity.
 ## Setup
 - Clone this repo somewhere on your system. (Or download the Zip with CODE > Download Zip above)
-- Run server.exe (or mac-server for MacOS, linux-server for linux)
-- You're good to go! You could also set up Card Conjurer in a more traditional method using WAMP, Docker, XAMPP, etc.
+- **Linux Mint / desktop launcher:** run `setup-desktop.sh` once to create a double-clickable icon on your desktop
+- **Other platforms:** Run `server.exe` (or `mac-server` for MacOS, `linux-server` for linux), or use Docker / WAMP / XAMPP, etc.
 
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg?longCache=true&style=popout)](https://www.paypal.me/kyleburtondonate
@@ -84,13 +84,15 @@ Be sure, that you are running Docker Desktop under Windows or Mac before you can
 
 ## Using Local Images
 
-If you're saving a lot of cards custom images you might hit the data limit for uploaded images (about 2MB).
+If you're saving a lot of cards with custom images you might hit the data limit for uploaded images (about 2MB).
 
-You can avoid this by putting the image files in the `local_art` directory of this repo. Then, when selecting the image in the Art tab of the card creator, instead of uploading the image you can type the file name in the "Via URL" field. This will use the image directly from the `local_art` directory instead of needing to store the whole image in the save file.
+You can avoid this by putting image files in the `local_art` directory of this repo. The Art tab in the card creator will automatically show a dropdown listing every image in that folder — just select one to load it instantly.
 
-For example if you add the file:
+You can also type a bare filename (e.g. `my_art.jpg`) in the "Via URL" field and hit enter. This resolves to `local_art/my_art.jpg` so the image is referenced directly from disk instead of being stored in your save file.
+
+For example, if you add the file:
 `cardconjurer/local_art/my_art.jpg`
 
-You can load it in the "Via URL" box by typing:
-`my_art.jpg`
-then hitting enter.
+You can load it by either:
+- Picking it from the **"Or pick a local art file from local_art/"** dropdown
+- Typing `my_art.jpg` in the **"Via URL"** box and hitting enter
