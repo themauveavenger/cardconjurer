@@ -1,2 +1,2 @@
-[tool]
-node = 26
+[tools]
+node = '26'
