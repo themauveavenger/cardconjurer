@@ -302,7 +302,7 @@
 						            <input type='file' multiple accept='.png, .svg, .jpg, .jpeg, .bmp' placeholder='File Upload' class='input' oninput='uploadFiles(event.target.files, uploadArt, document.querySelector("#art-update-autofit").checked ? "autoFit" : "");' data-dropFunction='uploadArt' data-otherParams='autoFit'>
 						        </div>
 						        <div>
-									<input type='url' placeholder='Via URL' class='input' onchange='uploadArt(this.value, document.querySelector("#art-update-autofit").checked ? "autoFit" : "");'>
+									<input type='url' placeholder='Via URL or local filename' class='input' onchange='imageURL(this.value, uploadArt, document.querySelector("#art-update-autofit").checked ? "autoFit" : "");'>
 									<h5 class='input-description margin-bottom'></h5>
 										<label class='checkbox-container input'>Autofit when setting art
 											<input id='art-update-autofit' type='checkbox' onchange='setAutofit();'>
@@ -310,6 +310,10 @@
 										</label>
 								</div>
 							</div>
+							<h5 class='padding margin-bottom input-description'>Or pick a local art file from local_art/</h5>
+							<select id='local-art-select' class='input margin-bottom' onchange='selectLocalArt(this.value);' onfocus='loadLocalArtList();'>
+								<option value='' disabled selected>— Click to load local art files —</option>
+							</select>
 							<h5 class='margin-bottom padding input-description'>Or enter a card name</h5>
 							<input id='art-name' type='text' placeholder='Enter Card Name' class='input margin-bottom' onchange="fetchScryfallData(this.value, artFromScryfall, 'art');">
 							<h5 class='padding margin-bottom input-description'>Select a specific card art to load</h5>
@@ -922,6 +926,6 @@
 	-->
 
 	</div>
-	<script defer src='/js/creator-23.js'></script>
+	<script defer src='/js/creator-23.js?v=2'></script>
 	<script defer src='/js/frameSearch.js'></script>
 <!-- END OF CONTENT -->

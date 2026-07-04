@@ -4088,6 +4088,42 @@ async function addTextbox(textboxType) {
 	}
 }
 //ART TAB
+function loadLocalArtList() {
+	const select = document.querySelector('#local-art-select');
+	if (!select) return;
+	fetch('/local_art/')
+		.then(response => response.text())
+		.then(html => {
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(html, 'text/html');
+			const links = doc.querySelectorAll('a');
+			// Clear any previously loaded options (keeps placeholder)
+			while (select.options.length > 1) select.remove(1);
+			let count = 0;
+			links.forEach(link => {
+				const href = link.getAttribute('href');
+				// Skip hidden files, parent dir link, and non-image extensions
+				if (href && !href.startsWith('.') && href !== '../' && /\.(png|svg|jpg|jpeg|bmp|webp|gif)$/i.test(href)) {
+					const option = document.createElement('option');
+					option.value = '/local_art/' + href;
+					option.textContent = href;
+					select.appendChild(option);
+					count++;
+				}
+			});
+			if (count === 0) {
+				const option = document.createElement('option');
+				option.disabled = true;
+				option.textContent = '(no images found in local_art/)';
+				select.appendChild(option);
+			}
+		})
+		.catch(err => console.error('Failed to load local art list:', err));
+}
+function selectLocalArt(value) {
+	if (!value) return;
+	uploadArt(value, document.querySelector('#art-update-autofit').checked ? 'autoFit' : '');
+}
 function uploadArt(imageSource, otherParams) {
 	art.src = imageSource;
 	if (otherParams && otherParams == 'autoFit') {
@@ -5541,3 +5577,4 @@ bindInputs('#show-guidelines', '#show-guidelines-2', true);
 loadScript('/js/frames/groupStandard-3.js');
 loadAvailableCards();
 initDraggableArt();
+loadLocalArtList();
