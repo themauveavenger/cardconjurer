@@ -1,0 +1,9 @@
+{
+  "name": "cardconjurer",
+  "version": "1.0.0",
+  "description": "Custom Magic: The Gathering card creator",
+  "scripts": {
+    "test": "node --test"
+  },
+  "private": true
+}
