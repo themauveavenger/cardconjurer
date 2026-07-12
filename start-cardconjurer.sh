@@ -8,16 +8,15 @@ echo "   CARD CONJURER is starting..."
 echo "================================="
 echo ""
 
-# Start the Python HTTP server in the foreground
-# (Using python3 -m http.server since launcher.py is just a thin wrapper)
-python3 -m http.server 8080 --bind 127.0.0.1 &
+# Start the extended Card Conjurer server in the foreground
+# (launcher.py serves static files and the card persistence API)
+python3 launcher.py &
 SERVER_PID=$!
 
 # Give it a moment to start
 sleep 1
 
-# Open the browser
-xdg-open http://localhost:8080
+# launcher.py opens the browser automatically
 
 echo "Server is running at http://localhost:8080"
 echo "Open your browser to that address if it didn't open automatically."

@@ -33,6 +33,13 @@ error.log
 
 fly.toml
 
+# Saved card files (server-side persistence)
+/saved_cards/
+
+# Python cache
+__pycache__/
+*.pyc
+
 # matt pocock skills issue tracker
 .scratch/
 
