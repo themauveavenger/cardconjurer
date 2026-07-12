@@ -24,8 +24,7 @@ HELPERS
 
 def ensure_saved_cards_dir():
     """Create the saved cards directory if it does not exist."""
-    if not os.path.exists(SAVED_CARDS_DIR):
-        os.makedirs(SAVED_CARDS_DIR)
+    os.makedirs(SAVED_CARDS_DIR, exist_ok=True)
 
 
 def sanitize_card_name(card_name):
@@ -48,12 +47,6 @@ def sanitize_card_name(card_name):
     decoded = re.sub(r"[ _]+", "_", decoded)
     # Truncate to avoid overly long filenames.
     return decoded[:120] or "untitled"
-
-
-def card_path(card_name):
-    """Return the on-disk path for a sanitized card name."""
-    safe_name = sanitize_card_name(card_name)
-    return os.path.join(SAVED_CARDS_DIR, safe_name + ".json")
 
 
 def list_saved_cards():
@@ -126,7 +119,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_get_card(self, card_name):
         safe_name = sanitize_card_name(card_name)
-        file_path = card_path(card_name)
+        file_path = os.path.join(SAVED_CARDS_DIR, safe_name + ".json")
 
         if not os.path.exists(file_path):
             send_text(self, 404, f"Card '{safe_name}' not found.")
@@ -163,7 +156,7 @@ class Handler(SimpleHTTPRequestHandler):
         card_data = payload.get("data", {})
 
         safe_name = sanitize_card_name(card_name)
-        file_path = card_path(card_name)
+        file_path = os.path.join(SAVED_CARDS_DIR, safe_name + ".json")
 
         try:
             ensure_saved_cards_dir()

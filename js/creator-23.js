@@ -49,7 +49,9 @@ function getStandardHeight() {
 //card object
 var card = {width:getStandardWidth(), height:getStandardHeight(), marginX:0, marginY:0, frames:[], artSource:fixUri('/img/blank.png'), artX:0, artY:0, artZoom:1, artRotate:0, setSymbolSource:fixUri('/img/blank.png'), setSymbolX:0, setSymbolY:0, setSymbolZoom:1, watermarkSource:fixUri('/img/blank.png'), watermarkX:0, watermarkY:0, watermarkZoom:1, watermarkLeft:'none', watermarkRight:'none', watermarkOpacity:0.4, version:'', manaSymbols:[]};
 //server-side card persistence
-const cardStorage = typeof createCardStorage === 'function' ? createCardStorage() : null;
+const cardStorage = typeof createCardStorage === 'function'
+	? createCardStorage({ fetch: window.fetch.bind(window), notify: typeof notify === 'function' ? notify : undefined })
+	: null;
 //core images/masks
 const black = new Image(); black.crossOrigin = 'anonymous'; black.src = fixUri('/img/black.png');
 const blank = new Image(); blank.crossOrigin = 'anonymous'; blank.src = fixUri('/img/blank.png');
@@ -4339,34 +4341,38 @@ function changeCardIndex() {
 		fetchSetSymbol();
 	}
 }
-async function loadAvailableCards() {
-	document.querySelector('#load-card-options').innerHTML = '<option selected="selected" disabled>None selected</option>';
+function setLoadStatus(placeholder, saveEnabled, saveTitle) {
+	const loadOptions = document.querySelector('#load-card-options');
+	loadOptions.innerHTML = '';
+	const placeholderOption = document.createElement('option');
+	placeholderOption.value = '';
+	placeholderOption.selected = true;
+	placeholderOption.disabled = true;
+	placeholderOption.textContent = placeholder;
+	loadOptions.appendChild(placeholderOption);
 	const saveButton = document.querySelector('#save-card-button');
 	if (saveButton) {
-		saveButton.disabled = false;
-		saveButton.title = '';
+		saveButton.disabled = !saveEnabled;
+		saveButton.title = saveTitle;
 	}
+}
+async function loadAvailableCards() {
 	if (!cardStorage) {
-		document.querySelector('#load-card-options').innerHTML = '<option selected="selected" disabled>Storage unavailable</option>';
-		if (saveButton) {
-			saveButton.disabled = true;
-			saveButton.title = 'Card storage is unavailable. Start Card Conjurer through the launcher.';
-		}
+		setLoadStatus('Storage unavailable', false, 'Card storage is unavailable. Start Card Conjurer through the launcher.');
 		return;
 	}
+	setLoadStatus('None selected', true, '');
 	try {
 		const cardKeys = await cardStorage.listCards();
+		const loadOptions = document.querySelector('#load-card-options');
 		cardKeys.forEach(item => {
-			var cardKeyOption = document.createElement('option');
-			cardKeyOption.innerHTML = item;
-			document.querySelector('#load-card-options').appendChild(cardKeyOption);
+			const cardKeyOption = document.createElement('option');
+			cardKeyOption.value = item;
+			cardKeyOption.textContent = item;
+			loadOptions.appendChild(cardKeyOption);
 		});
 	} catch (error) {
-		document.querySelector('#load-card-options').innerHTML = '<option selected="selected" disabled>Server unavailable</option>';
-		if (saveButton) {
-			saveButton.disabled = true;
-			saveButton.title = 'Server is unreachable. Make sure Card Conjurer is running through the launcher.';
-		}
+		setLoadStatus('Server unavailable', false, 'Server is unreachable. Make sure Card Conjurer is running through the launcher.');
 	}
 }
 function importChanged() {
@@ -4384,11 +4390,13 @@ async function saveCard() {
 	cardKey = cardKey.trim();
 	try {
 		var existingKeys = await cardStorage.listCards();
-		if (existingKeys.includes(cardKey)) {
+		// listCards returns sanitized filenames, so compare the sanitized key
+		// rather than the raw user-typed name (spaces differ, etc.).
+		if (existingKeys.includes(cardStorage.sanitizeKey(cardKey))) {
 			if (!confirm('Would you like to overwrite your card previously saved as "' + cardKey + '"?\n(Clicking "cancel" will affix a version number)')) {
 				var originalCardKey = cardKey;
 				var cardKeyNumber = 1;
-				while (existingKeys.includes(cardKey)) {
+				while (existingKeys.includes(cardStorage.sanitizeKey(cardKey))) {
 					cardKey = originalCardKey + ' (' + cardKeyNumber + ')';
 					cardKeyNumber ++;
 				}
@@ -4410,7 +4418,9 @@ async function saveCard() {
 	}
 }
 async function loadCard(selectedCardKey) {
-	if (!selectedCardKey || selectedCardKey == 'None selected' || selectedCardKey == 'Server unavailable' || selectedCardKey == 'Storage unavailable') {
+	// Placeholder options carry value="", so an empty value means no real
+	// card is selected (replaces the previous magic-string comparison).
+	if (!selectedCardKey) {
 		return;
 	}
 	if (!cardStorage) {
