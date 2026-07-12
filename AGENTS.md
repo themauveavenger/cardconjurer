@@ -68,6 +68,7 @@ Card Conjurer — custom Magic: The Gathering card creator. Static HTML/CSS/JS w
 
 ## NOTES
 - The `data/` directory contains both runtime assets (fonts, images) and JS utilities (scripts/).
+- **Test-server cleanup.** When starting a background server for smoke tests (e.g. `launcher.py` on port 8080, or a `python3 -c "...serve_forever()"` harness), record the child PID explicitly and verify it is dead before finishing. `$!` from a backgrounded subshell may capture the subshell rather than the long-lived child, leaving an orphan holding the port — and a stale `serve_forever` process will serve old code, masking whether the committed source actually works. After killing, confirm with `ss -tlnp | grep :8080` (or `netstat`) that nothing is listening, and confirm the PID is gone with `ps -p <pid>`. Prefer `pkill -f` on the specific invocation string, or `setsid ... & echo $!` to get the real child, over relying on `$!` across a backgrounded compound command. Don't leave test artifacts behind either: clean up any files created in `saved_cards/` (or other runtime dirs) so the user's real data is preserved.
 
 ## Agent skills
 
