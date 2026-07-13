@@ -52,6 +52,11 @@ var card = {width:getStandardWidth(), height:getStandardHeight(), marginX:0, mar
 const cardStorage = typeof createCardStorage === 'function'
 	? createCardStorage({ fetch: window.fetch.bind(window), notify: typeof notify === 'function' ? notify : undefined })
 	: null;
+//save status tracking
+var activeCardKey = null;
+var lastSavedSnapshot = null;
+var isLoadingCard = false;
+var dirtyCheckTimer = null;
 //core images/masks
 const black = new Image(); black.crossOrigin = 'anonymous'; black.src = fixUri('/img/black.png');
 const blank = new Image(); blank.crossOrigin = 'anonymous'; blank.src = fixUri('/img/blank.png');
@@ -3999,6 +4004,7 @@ function drawCard() {
 	// show preview
 	previewContext.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 	previewContext.drawImage(cardCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+	scheduleDirtyCheck();
 }
 //DOWNLOADING
 function downloadCard(alt = false, jpeg = false) {
@@ -4379,6 +4385,73 @@ function importChanged() {
 	var unique = document.querySelector('#importAllPrints').checked ? 'prints' : '';
 	fetchScryfallData(document.querySelector("#import-name").value, importCard, unique);
 }
+//SAVE STATUS BAR
+function getSaveSnapshot() {
+	var snapshot = JSON.parse(JSON.stringify(card));
+	snapshot.frames.forEach(frame => {
+		delete frame.image;
+		frame.masks.forEach(mask => delete mask.image);
+	});
+	return JSON.stringify(snapshot);
+}
+function updateSaveStatus() {
+	var statusText = document.querySelector('#save-status-text');
+	var statusButton = document.querySelector('#save-status-button');
+	if (!statusText || !statusButton) return;
+	var displayName = activeCardKey ? activeCardKey.replace(/_/g, ' ') : 'New card';
+	var bar = document.querySelector('#save-status-bar');
+	if (!activeCardKey) {
+		var currentSnapshot = getSaveSnapshot();
+		var isDirty = lastSavedSnapshot !== null && currentSnapshot !== lastSavedSnapshot;
+		statusText.textContent = isDirty ? displayName + ' — unsaved changes' : displayName;
+		statusButton.textContent = 'Save';
+		statusButton.disabled = false;
+		if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding' + (isDirty ? ' status-dirty' : '');
+	} else {
+		var currentSnapshot = getSaveSnapshot();
+		var isDirty = currentSnapshot !== lastSavedSnapshot;
+		if (isDirty) {
+			statusText.textContent = displayName + ' — unsaved changes';
+			if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding status-dirty';
+		} else {
+			statusText.textContent = displayName;
+			if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding';
+		}
+		statusButton.textContent = 'Rename';
+		statusButton.disabled = false;
+	}
+	if (isDirty) {
+		window.onbeforeunload = function() { return 'Changes you made may not be saved.'; };
+	} else {
+		window.onbeforeunload = null;
+	}
+}
+function scheduleDirtyCheck() {
+	if (isLoadingCard) return;
+	clearTimeout(dirtyCheckTimer);
+	dirtyCheckTimer = setTimeout(updateSaveStatus, 600);
+}
+function saveStatusButtonClicked() {
+	if (!activeCardKey) {
+		saveCard();
+	} else {
+		var newKey = prompt('Enter the new name for your card:', activeCardKey.replace(/_/g, ' '));
+		if (!newKey) return;
+		newKey = newKey.trim();
+		var oldKey = activeCardKey;
+		activeCardKey = cardStorage.sanitizeKey(newKey);
+		var cardToSave = JSON.parse(JSON.stringify(card));
+		cardToSave.frames.forEach(frame => {
+			delete frame.image;
+			frame.masks.forEach(mask => delete mask.image);
+		});
+		cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
+			lastSavedSnapshot = getSaveSnapshot();
+			updateSaveStatus();
+			loadAvailableCards();
+		}).catch(function() {});
+	}
+}
 async function saveCard() {
 	if (!cardStorage) {
 		notify('Card storage is unavailable. Make sure Card Conjurer is running through the launcher.', 5);
@@ -4412,6 +4485,9 @@ async function saveCard() {
 	});
 	try {
 		await cardStorage.saveCard(cardKey, cardToSave);
+		activeCardKey = cardStorage.sanitizeKey(cardKey);
+		lastSavedSnapshot = getSaveSnapshot();
+		updateSaveStatus();
 		loadAvailableCards();
 	} catch (error) {
 		// cardStorage already notified
@@ -4427,6 +4503,7 @@ async function loadCard(selectedCardKey) {
 		notify('Card storage is unavailable. Make sure Card Conjurer is running through the launcher.', 5);
 		return;
 	}
+	isLoadingCard = true;
 	//clear the draggable frames
 	document.querySelector('#frame-list').innerHTML = null;
 	//clear the existing card, then replace it with the new JSON
@@ -4495,6 +4572,10 @@ async function loadCard(selectedCardKey) {
 			bottomInfoEdited();
 			watermarkEdited();
 		}
+		activeCardKey = selectedCardKey;
+		lastSavedSnapshot = getSaveSnapshot();
+		isLoadingCard = false;
+		updateSaveStatus();
 	}
 }
 //TUTORIAL TAB
@@ -4872,3 +4953,4 @@ loadScript('/js/frames/groupStandard-3.js');
 loadAvailableCards();
 initDraggableArt();
 loadLocalArtList();
+lastSavedSnapshot = getSaveSnapshot();

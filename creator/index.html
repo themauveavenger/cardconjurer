@@ -106,6 +106,10 @@
 					<h3 class='selectable readable-background' onclick='toggleCreatorTabs(event, "import")'>Import/Save</h3>
 					<h3 class='selectable readable-background' onclick='toggleCreatorTabs(event, "tutorial"); loadTutorialVideo();'>Tutorial</h3>
 				</div>
+				<div id='save-status-bar' class='save-status-bar readable-background margin-bottom padding'>
+					<span id='save-status-text'>New card</span>
+					<button id='save-status-button' class='input' onclick='saveStatusButtonClicked();'>Save</button>
+				</div>
 				<div id='creator-menu-sections' class='margin-bottom'>
 					<div id='creator-menu-frame'>
 						<div class='readable-background margin-bottom padding'>
@@ -666,8 +670,6 @@
 							</select>
 						</div>
 						<div class='readable-background margin-bottom padding'>
-							<h5 class='padding margin-bottom input-description'>Save your current card</h5>
-							<button id='save-card-button' class='input margin-bottom' onclick='saveCard();'>Save Card</button>
 							<h5 class='padding margin-bottom input-description'>Load a saved card</h5>
 							<select id='load-card-options' class='input margin-bottom' type='text' onchange='loadCard(this.value);'></select>
 						</div>
