@@ -4552,14 +4552,14 @@ function promptAndRename() {
 	var newKey = prompt('Enter the new name for your card:', activeCardKey.replace(/_/g, ' '));
 	if (!newKey) return;
 	newKey = newKey.trim();
-	var oldKey = activeCardKey;
-	activeCardKey = cardStorage.sanitizeKey(newKey);
+	var sanitizedNewKey = cardStorage.sanitizeKey(newKey);
 	var cardToSave = JSON.parse(JSON.stringify(card));
 	cardToSave.frames.forEach(frame => {
 		delete frame.image;
 		frame.masks.forEach(mask => delete mask.image);
 	});
-	cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
+	cardStorage.saveCard(sanitizedNewKey, cardToSave).then(function() {
+		activeCardKey = sanitizedNewKey;
 		lastSavedSnapshot = getSaveSnapshot();
 		lastSaveTimestamp = Date.now();
 		updateSaveStatus();
