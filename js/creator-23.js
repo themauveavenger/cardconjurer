@@ -4406,20 +4406,27 @@ function importChanged() {
 	fetchScryfallData(document.querySelector("#import-name").value, importCard, unique);
 }
 //SAVE STATUS BAR
-function getSaveSnapshot() {
-	var snapshot = JSON.parse(JSON.stringify(card));
-	snapshot.frames.forEach(frame => {
+// Deep-clone the card with runtime image objects stripped, identical to
+// the serialization saveCard() performs. Returns a plain object (not a string)
+// so callers can either save it or compare snapshots as strings.
+function getStrippedCard() {
+	var stripped = JSON.parse(JSON.stringify(card));
+	stripped.frames.forEach(frame => {
 		delete frame.image;
 		frame.masks.forEach(mask => delete mask.image);
 	});
-	return JSON.stringify(snapshot);
+	return stripped;
+}
+function getSaveSnapshot() {
+	return JSON.stringify(getStrippedCard());
 }
 function updateSaveStatus() {
 	var statusText = document.querySelector('#save-status-text');
 	var statusButton = document.querySelector('#save-status-button');
 	if (!statusText || !statusButton) return;
-	var displayName = activeCardKey ? activeCardKey.replace(/_/g, ' ') : 'New card';
+	var displayName = getCurrentCardDisplayName();
 	var bar = document.querySelector('#save-status-bar');
+	clearInterval(saveTimestampTimer);
 	if (!activeCardKey) {
 		var currentSnapshot = getSaveSnapshot();
 		var isDirty = lastSavedSnapshot !== null && currentSnapshot !== lastSavedSnapshot;
@@ -4444,7 +4451,7 @@ function updateSaveStatus() {
 	var currentSnapshot = getSaveSnapshot();
 	var isDirty = currentSnapshot !== lastSavedSnapshot;
 	if (isDirty) {
-		statusText.textContent = displayName + ' · unsaved changes';
+		statusText.textContent = displayName + ' · Unsaved changes';
 		if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding status-dirty';
 	} else {
 		statusText.textContent = displayName + ' · ' + formatRelativeTime(lastSaveTimestamp);
@@ -4457,10 +4464,8 @@ function updateSaveStatus() {
 	} else {
 		window.onbeforeunload = null;
 	}
-	clearInterval(saveTimestampTimer);
 	if (!isDirty) {
 		saveTimestampTimer = setInterval(function() {
-			if (!statusText) return;
 			var cs = getSaveSnapshot();
 			if (cs === lastSavedSnapshot) {
 				statusText.textContent = displayName + ' · ' + formatRelativeTime(lastSaveTimestamp);
@@ -4487,12 +4492,7 @@ function autoSave() {
 	if (currentSnapshot === lastSavedSnapshot) return;
 	isSaving = true;
 	updateSaveStatus();
-	var cardToSave = JSON.parse(JSON.stringify(card));
-	cardToSave.frames.forEach(frame => {
-		delete frame.image;
-		frame.masks.forEach(mask => delete mask.image);
-	});
-	cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
+	cardStorage.saveCard(activeCardKey, getStrippedCard()).then(function() {
 		lastSavedSnapshot = getSaveSnapshot();
 		lastSaveTimestamp = Date.now();
 		isSaving = false;
@@ -4526,14 +4526,9 @@ function saveStatusButtonClicked() {
 		var currentSnapshot = getSaveSnapshot();
 		var isDirty = currentSnapshot !== lastSavedSnapshot;
 		if (isDirty) {
-			var cardToSave = JSON.parse(JSON.stringify(card));
-			cardToSave.frames.forEach(frame => {
-				delete frame.image;
-				frame.masks.forEach(mask => delete mask.image);
-			});
 			isSaving = true;
 			updateSaveStatus();
-			cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
+			cardStorage.saveCard(activeCardKey, getStrippedCard()).then(function() {
 				lastSavedSnapshot = getSaveSnapshot();
 				lastSaveTimestamp = Date.now();
 				isSaving = false;
@@ -4549,22 +4544,34 @@ function saveStatusButtonClicked() {
 	}
 }
 function promptAndRename() {
-	var newKey = prompt('Enter the new name for your card:', activeCardKey.replace(/_/g, ' '));
+	var newKey = prompt('Enter the new name for your card:', getCurrentCardDisplayName());
 	if (!newKey) return;
 	newKey = newKey.trim();
 	var sanitizedNewKey = cardStorage.sanitizeKey(newKey);
-	var cardToSave = JSON.parse(JSON.stringify(card));
-	cardToSave.frames.forEach(frame => {
-		delete frame.image;
-		frame.masks.forEach(mask => delete mask.image);
-	});
-	cardStorage.saveCard(sanitizedNewKey, cardToSave).then(function() {
-		activeCardKey = sanitizedNewKey;
-		lastSavedSnapshot = getSaveSnapshot();
-		lastSaveTimestamp = Date.now();
+	// Avoid silently overwriting an existing save. listCards returns sanitized
+	// filenames, so compare against the sanitized new key.
+	cardStorage.listCards().then(function(existingKeys) {
+		if (existingKeys.includes(sanitizedNewKey) && sanitizedNewKey !== activeCardKey) {
+			if (!confirm('A card saved as "' + newKey + '" already exists. Overwrite it?')) {
+				return;
+			}
+		}
+		isSaving = true;
 		updateSaveStatus();
-		loadAvailableCards();
-	}).catch(function() {});
+		cardStorage.saveCard(sanitizedNewKey, getStrippedCard()).then(function() {
+			activeCardKey = sanitizedNewKey;
+			lastSavedSnapshot = getSaveSnapshot();
+			lastSaveTimestamp = Date.now();
+			isSaving = false;
+			updateSaveStatus();
+			loadAvailableCards();
+		}).catch(function() {
+			isSaving = false;
+			updateSaveStatus();
+		});
+	}).catch(function() {
+		// listCards already notified via cardStorage
+	});
 }
 async function saveCard() {
 	if (!cardStorage) {
@@ -4592,11 +4599,7 @@ async function saveCard() {
 	} catch (error) {
 		return;
 	}
-	var cardToSave = JSON.parse(JSON.stringify(card));
-	cardToSave.frames.forEach(frame => {
-		delete frame.image;
-		frame.masks.forEach(mask => delete mask.image);
-	});
+	var cardToSave = getStrippedCard();
 	try {
 		await cardStorage.saveCard(cardKey, cardToSave);
 		activeCardKey = cardStorage.sanitizeKey(cardKey);
@@ -4624,79 +4627,82 @@ async function loadCard(selectedCardKey) {
 		}
 	}
 	isLoadingCard = true;
-	//clear the draggable frames
-	document.querySelector('#frame-list').innerHTML = null;
-	//clear the existing card, then replace it with the new JSON
-	card = {};
 	try {
-		card = await cardStorage.loadCard(selectedCardKey);
-	} catch (error) {
-		notify(selectedCardKey + ' failed to load.', 5);
-		return;
-	}
-	//if the card was loaded properly...
-	if (card) {
-		//load values from card into html inputs
-		document.querySelector('#info-number').value = card.infoNumber;
-		document.querySelector('#info-rarity').value = card.infoRarity;
-		document.querySelector('#info-set').value = card.infoSet;
-		document.querySelector('#info-language').value = card.infoLanguage;
-		document.querySelector('#info-note').value = card.infoNote;
-		document.querySelector('#info-year').value = card.infoYear || date.getFullYear();
-		artistEdited(card.infoArtist);
-		document.querySelector('#text-editor').value = card.text[Object.keys(card.text)[selectedTextIndex]].text;
-		document.querySelector('#text-editor-font-size').value = card.text[Object.keys(card.text)[selectedTextIndex]].fontSize || 0;
-		loadTextOptions(card.text);
-		document.querySelector('#art-x').value = scaleX(card.artX) - scaleWidth(card.marginX);
-		document.querySelector('#art-y').value = scaleY(card.artY) - scaleHeight(card.marginY);
-		document.querySelector('#art-zoom').value = card.artZoom * 100;
-		document.querySelector('#art-rotate').value = card.artRotate || 0;
-		uploadArt(card.artSource);
-		document.querySelector('#setSymbol-x').value = scaleX(card.setSymbolX) - scaleWidth(card.marginX);
-		document.querySelector('#setSymbol-y').value = scaleY(card.setSymbolY) - scaleHeight(card.marginY);
-		document.querySelector('#setSymbol-zoom').value = card.setSymbolZoom * 100;
-		uploadSetSymbol(card.setSymbolSource);
-		document.querySelector('#watermark-x').value = scaleX(card.watermarkX) - scaleWidth(card.marginX);
-		document.querySelector('#watermark-y').value = scaleY(card.watermarkY) - scaleHeight(card.marginY);
-		document.querySelector('#watermark-zoom').value = card.watermarkZoom * 100;
-		// document.querySelector('#watermark-left').value = card.watermarkLeft;
-		// document.querySelector('#watermark-right').value = card.watermarkRight;
-		document.querySelector('#watermark-opacity').value = card.watermarkOpacity * 100;
-		document.getElementById("rounded-corners").checked = !card.noCorners;
-		uploadWatermark(card.watermarkSource);
-		document.querySelector('#serial-number').value = card.serialNumber;
-		document.querySelector('#serial-total').value = card.serialTotal;
-		document.querySelector('#serial-x').value = card.serialX;
-		document.querySelector('#serial-y').value = card.serialY;
-		document.querySelector('#serial-scale').value = card.serialScale;
-		serialInfoEdited();
+		//clear the draggable frames
+		document.querySelector('#frame-list').innerHTML = null;
+		//clear the existing card, then replace it with the new JSON
+		card = {};
+		try {
+			card = await cardStorage.loadCard(selectedCardKey);
+		} catch (error) {
+			notify(selectedCardKey + ' failed to load.', 5);
+			return;
+		}
+		//if the card was loaded properly...
+		if (card) {
+			//load values from card into html inputs
+			document.querySelector('#info-number').value = card.infoNumber;
+			document.querySelector('#info-rarity').value = card.infoRarity;
+			document.querySelector('#info-set').value = card.infoSet;
+			document.querySelector('#info-language').value = card.infoLanguage;
+			document.querySelector('#info-note').value = card.infoNote;
+			document.querySelector('#info-year').value = card.infoYear || date.getFullYear();
+			artistEdited(card.infoArtist);
+			document.querySelector('#text-editor').value = card.text[Object.keys(card.text)[selectedTextIndex]].text;
+			document.querySelector('#text-editor-font-size').value = card.text[Object.keys(card.text)[selectedTextIndex]].fontSize || 0;
+			loadTextOptions(card.text);
+			document.querySelector('#art-x').value = scaleX(card.artX) - scaleWidth(card.marginX);
+			document.querySelector('#art-y').value = scaleY(card.artY) - scaleHeight(card.marginY);
+			document.querySelector('#art-zoom').value = card.artZoom * 100;
+			document.querySelector('#art-rotate').value = card.artRotate || 0;
+			uploadArt(card.artSource);
+			document.querySelector('#setSymbol-x').value = scaleX(card.setSymbolX) - scaleWidth(card.marginX);
+			document.querySelector('#setSymbol-y').value = scaleY(card.setSymbolY) - scaleHeight(card.marginY);
+			document.querySelector('#setSymbol-zoom').value = card.setSymbolZoom * 100;
+			uploadSetSymbol(card.setSymbolSource);
+			document.querySelector('#watermark-x').value = scaleX(card.watermarkX) - scaleWidth(card.marginX);
+			document.querySelector('#watermark-y').value = scaleY(card.watermarkY) - scaleHeight(card.marginY);
+			document.querySelector('#watermark-zoom').value = card.watermarkZoom * 100;
+			// document.querySelector('#watermark-left').value = card.watermarkLeft;
+			// document.querySelector('#watermark-right').value = card.watermarkRight;
+			document.querySelector('#watermark-opacity').value = card.watermarkOpacity * 100;
+			document.getElementById("rounded-corners").checked = !card.noCorners;
+			uploadWatermark(card.watermarkSource);
+			document.querySelector('#serial-number').value = card.serialNumber;
+			document.querySelector('#serial-total').value = card.serialTotal;
+			document.querySelector('#serial-x').value = card.serialX;
+			document.querySelector('#serial-y').value = card.serialY;
+			document.querySelector('#serial-scale').value = card.serialScale;
+			serialInfoEdited();
 
-		card.frames.reverse();
-		await card.frames.forEach(item => addFrame([], item));
-		card.frames.reverse();
-		if (card.onload) {
-			await loadScript(card.onload);
-		}
-		card.manaSymbols.forEach(item => loadScript(item));
-		//canvases
-		var canvasesResized = false;
-		canvasList.forEach(name => {
-			if (window[name + 'Canvas'].width != card.width * (1 + card.marginX) || window[name + 'Canvas'].height != card.height * (1 + card.marginY)) {
-				sizeCanvas(name);
-				canvasesResized = true;
+			card.frames.reverse();
+			await card.frames.forEach(item => addFrame([], item));
+			card.frames.reverse();
+			if (card.onload) {
+				await loadScript(card.onload);
 			}
-		});
-		if (canvasesResized) {
-			drawTextBuffer();
-			drawFrames();
-			bottomInfoEdited();
-			watermarkEdited();
+			card.manaSymbols.forEach(item => loadScript(item));
+			//canvases
+			var canvasesResized = false;
+			canvasList.forEach(name => {
+				if (window[name + 'Canvas'].width != card.width * (1 + card.marginX) || window[name + 'Canvas'].height != card.height * (1 + card.marginY)) {
+					sizeCanvas(name);
+					canvasesResized = true;
+				}
+			});
+			if (canvasesResized) {
+				drawTextBuffer();
+				drawFrames();
+				bottomInfoEdited();
+				watermarkEdited();
+			}
+			activeCardKey = selectedCardKey;
+			lastSavedSnapshot = getSaveSnapshot();
+			lastSaveTimestamp = Date.now();
+			updateSaveStatus();
 		}
-		activeCardKey = selectedCardKey;
-		lastSavedSnapshot = getSaveSnapshot();
-		lastSaveTimestamp = Date.now();
+	} finally {
 		isLoadingCard = false;
-		updateSaveStatus();
 	}
 }
 //TUTORIAL TAB

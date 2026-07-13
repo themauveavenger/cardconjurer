@@ -161,6 +161,8 @@
 	--color-primary: #35603E;
 	--color-selected: #ae9;
 	--color-highlight: #8f8;
+	--color-dirty: #c66d39;
+	--color-saving: #8cacc5;
 	--font-color: #fff;
 	--font-color-2: #bbb;
 	--input-background: #333;
@@ -729,10 +731,10 @@ textarea.input {
 	transition: border-color 0.5s;
 }
 .save-status-bar.status-dirty {
-	border-left-color: #c66d39;
+	border-left-color: var(--color-dirty);
 }
 .save-status-bar.status-saving {
-	border-left-color: #8cacc5;
+	border-left-color: var(--color-saving);
 }
 .save-status-bar #save-status-text {
 	font-weight: bold;
