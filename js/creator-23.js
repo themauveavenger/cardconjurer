@@ -57,6 +57,12 @@ var activeCardKey = null;
 var lastSavedSnapshot = null;
 var isLoadingCard = false;
 var dirtyCheckTimer = null;
+//auto-save tracking
+var isSaving = false;
+var pendingSaveSnapshot = null;
+var autoSaveTimer = null;
+var lastSaveTimestamp = null;
+var saveTimestampTimer = null;
 //core images/masks
 const black = new Image(); black.crossOrigin = 'anonymous'; black.src = fixUri('/img/black.png');
 const blank = new Image(); blank.crossOrigin = 'anonymous'; blank.src = fixUri('/img/blank.png');
@@ -4407,50 +4413,144 @@ function updateSaveStatus() {
 		statusButton.textContent = 'Save';
 		statusButton.disabled = false;
 		if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding' + (isDirty ? ' status-dirty' : '');
-	} else {
-		var currentSnapshot = getSaveSnapshot();
-		var isDirty = currentSnapshot !== lastSavedSnapshot;
 		if (isDirty) {
-			statusText.textContent = displayName + ' — unsaved changes';
-			if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding status-dirty';
+			window.onbeforeunload = function() { return 'Changes you made may not be saved.'; };
 		} else {
-			statusText.textContent = displayName;
-			if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding';
+			window.onbeforeunload = null;
 		}
-		statusButton.textContent = 'Rename';
-		statusButton.disabled = false;
+		return;
 	}
+	if (isSaving) {
+		statusText.textContent = displayName + ' · Saving…';
+		statusButton.textContent = 'Rename';
+		statusButton.disabled = true;
+		if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding status-saving';
+		return;
+	}
+	var currentSnapshot = getSaveSnapshot();
+	var isDirty = currentSnapshot !== lastSavedSnapshot;
+	if (isDirty) {
+		statusText.textContent = displayName + ' · unsaved changes';
+		if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding status-dirty';
+	} else {
+		statusText.textContent = displayName + ' · ' + formatRelativeTime(lastSaveTimestamp);
+		if (bar) bar.className = 'save-status-bar readable-background margin-bottom padding';
+	}
+	statusButton.textContent = 'Rename';
+	statusButton.disabled = false;
 	if (isDirty) {
 		window.onbeforeunload = function() { return 'Changes you made may not be saved.'; };
 	} else {
 		window.onbeforeunload = null;
 	}
+	clearInterval(saveTimestampTimer);
+	if (!isDirty) {
+		saveTimestampTimer = setInterval(function() {
+			if (!statusText) return;
+			var cs = getSaveSnapshot();
+			if (cs === lastSavedSnapshot) {
+				statusText.textContent = displayName + ' · ' + formatRelativeTime(lastSaveTimestamp);
+			}
+		}, 10000);
+	}
 }
 function scheduleDirtyCheck() {
 	if (isLoadingCard) return;
 	clearTimeout(dirtyCheckTimer);
+	clearTimeout(autoSaveTimer);
 	dirtyCheckTimer = setTimeout(updateSaveStatus, 600);
+	if (activeCardKey) {
+		if (isSaving) {
+			pendingSaveSnapshot = getSaveSnapshot();
+		} else {
+			autoSaveTimer = setTimeout(autoSave, 2000);
+		}
+	}
+}
+function autoSave() {
+	if (!activeCardKey || isSaving || !cardStorage) return;
+	var currentSnapshot = getSaveSnapshot();
+	if (currentSnapshot === lastSavedSnapshot) return;
+	isSaving = true;
+	updateSaveStatus();
+	var cardToSave = JSON.parse(JSON.stringify(card));
+	cardToSave.frames.forEach(frame => {
+		delete frame.image;
+		frame.masks.forEach(mask => delete mask.image);
+	});
+	cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
+		lastSavedSnapshot = getSaveSnapshot();
+		lastSaveTimestamp = Date.now();
+		isSaving = false;
+		updateSaveStatus();
+		if (pendingSaveSnapshot !== null) {
+			var snapshot = pendingSaveSnapshot;
+			pendingSaveSnapshot = null;
+			if (snapshot !== lastSavedSnapshot) {
+				autoSaveTimer = setTimeout(autoSave, 2000);
+			}
+		}
+	}).catch(function() {
+		isSaving = false;
+		updateSaveStatus();
+	});
+}
+function formatRelativeTime(timestamp) {
+	if (!timestamp) return '';
+	var seconds = Math.floor((Date.now() - timestamp) / 1000);
+	if (seconds < 10) return 'Saved just now';
+	if (seconds < 60) return 'Saved ' + seconds + 's ago';
+	var minutes = Math.floor(seconds / 60);
+	if (minutes < 60) return 'Saved ' + minutes + 'm ago';
+	var hours = Math.floor(minutes / 60);
+	return 'Saved ' + hours + 'h ago';
 }
 function saveStatusButtonClicked() {
 	if (!activeCardKey) {
 		saveCard();
 	} else {
-		var newKey = prompt('Enter the new name for your card:', activeCardKey.replace(/_/g, ' '));
-		if (!newKey) return;
-		newKey = newKey.trim();
-		var oldKey = activeCardKey;
-		activeCardKey = cardStorage.sanitizeKey(newKey);
-		var cardToSave = JSON.parse(JSON.stringify(card));
-		cardToSave.frames.forEach(frame => {
-			delete frame.image;
-			frame.masks.forEach(mask => delete mask.image);
-		});
-		cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
-			lastSavedSnapshot = getSaveSnapshot();
+		var currentSnapshot = getSaveSnapshot();
+		var isDirty = currentSnapshot !== lastSavedSnapshot;
+		if (isDirty) {
+			var cardToSave = JSON.parse(JSON.stringify(card));
+			cardToSave.frames.forEach(frame => {
+				delete frame.image;
+				frame.masks.forEach(mask => delete mask.image);
+			});
+			isSaving = true;
 			updateSaveStatus();
-			loadAvailableCards();
-		}).catch(function() {});
+			cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
+				lastSavedSnapshot = getSaveSnapshot();
+				lastSaveTimestamp = Date.now();
+				isSaving = false;
+				updateSaveStatus();
+				promptAndRename();
+			}).catch(function() {
+				isSaving = false;
+				updateSaveStatus();
+			});
+		} else {
+			promptAndRename();
+		}
 	}
+}
+function promptAndRename() {
+	var newKey = prompt('Enter the new name for your card:', activeCardKey.replace(/_/g, ' '));
+	if (!newKey) return;
+	newKey = newKey.trim();
+	var oldKey = activeCardKey;
+	activeCardKey = cardStorage.sanitizeKey(newKey);
+	var cardToSave = JSON.parse(JSON.stringify(card));
+	cardToSave.frames.forEach(frame => {
+		delete frame.image;
+		frame.masks.forEach(mask => delete mask.image);
+	});
+	cardStorage.saveCard(activeCardKey, cardToSave).then(function() {
+		lastSavedSnapshot = getSaveSnapshot();
+		lastSaveTimestamp = Date.now();
+		updateSaveStatus();
+		loadAvailableCards();
+	}).catch(function() {});
 }
 async function saveCard() {
 	if (!cardStorage) {
@@ -4487,6 +4587,7 @@ async function saveCard() {
 		await cardStorage.saveCard(cardKey, cardToSave);
 		activeCardKey = cardStorage.sanitizeKey(cardKey);
 		lastSavedSnapshot = getSaveSnapshot();
+		lastSaveTimestamp = Date.now();
 		updateSaveStatus();
 		loadAvailableCards();
 	} catch (error) {
@@ -4574,6 +4675,7 @@ async function loadCard(selectedCardKey) {
 		}
 		activeCardKey = selectedCardKey;
 		lastSavedSnapshot = getSaveSnapshot();
+		lastSaveTimestamp = Date.now();
 		isLoadingCard = false;
 		updateSaveStatus();
 	}
