@@ -4125,8 +4125,22 @@ function scryfallCardFromText(text) {
   return cardObject;
 }
 
+function shouldWarnBeforeDestructiveAction() {
+	if (activeCardKey) return true;
+	var currentSnapshot = getSaveSnapshot();
+	return currentSnapshot !== lastSavedSnapshot;
+}
+function getCurrentCardDisplayName() {
+	return activeCardKey ? activeCardKey.replace(/_/g, ' ') : 'New card';
+}
 function changeCardIndex() {
 	var cardToImport = scryfallCard[document.querySelector('#import-index').value];
+	if (shouldWarnBeforeDestructiveAction()) {
+		var incomingName = cardToImport.name || 'unnamed';
+		if (!confirm('Importing will replace \'' + getCurrentCardDisplayName() + '\' with \'' + incomingName + '\'. Any unsaved changes will be lost. Continue?')) {
+			return;
+		}
+	}
 	//text
 	var langFontCode = "";
 	if (cardToImport.lang == "ph") {langFontCode = "{fontphyrexian}"}
@@ -4603,6 +4617,11 @@ async function loadCard(selectedCardKey) {
 	if (!cardStorage) {
 		notify('Card storage is unavailable. Make sure Card Conjurer is running through the launcher.', 5);
 		return;
+	}
+	if (shouldWarnBeforeDestructiveAction()) {
+		if (!confirm('Loading will replace \'' + getCurrentCardDisplayName() + '\' with \'' + selectedCardKey.replace(/_/g, ' ') + '\'. Any unsaved changes will be lost. Continue?')) {
+			return;
+		}
 	}
 	isLoadingCard = true;
 	//clear the draggable frames
